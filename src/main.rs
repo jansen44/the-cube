@@ -30,8 +30,13 @@ impl Canvas {
     fn map_coordinate(x: u32, y: u32) -> usize {
         let x = if x as i32 - 1 < 0 { 0 as u32 } else { x - 1 };
         let y = ((CANVAS_HEIGHT - 1) as i32 - y as i32).abs() as u32;
+        let idx = (x + y * CANVAS_WIDTH) as usize;
 
-        (x + y * CANVAS_WIDTH) as usize
+        if idx as u32 >= CANVAS_HEIGHT * CANVAS_WIDTH {
+            0
+        } else {
+            idx
+        }
     }
 
     pub fn clear_canvas(&mut self) {
@@ -104,9 +109,14 @@ fn main() {
     let minimum_frame_duration = 1000 / FPS;
 
     let mut canvas = Canvas::new();
+    let mut degree: f32 = 0.0;
 
-    let mut x = 0;
-    let mut direction = 1;
+    let initial_a: (f32, f32) = (15.0, CANVAS_HEIGHT as f32 / 2.0);
+    let initial_b: (f32, f32) = (35.0, CANVAS_HEIGHT as f32 / 2.0);
+    let medium: (f32, f32) = (
+        (initial_a.0 + initial_b.0) / 2.0,
+        (initial_a.1 + initial_b.1) / 2.0,
+    );
 
     loop {
         let start = Instant::now();
@@ -116,23 +126,28 @@ fn main() {
             let start_render = Instant::now();
             canvas.clear_canvas();
 
-            if x > CANVAS_WIDTH as i32 - 1 && direction > 0 {
-                direction = -1;
-            } else if x <= 0 && direction < 0 {
-                direction = 1;
-            }
+            let cos = degree.cos();
+            let sin = degree.sin();
 
-            x += direction;
+            let a = ((initial_a.0 - medium.0), (initial_a.1 - medium.1));
+            let a = (
+                ((a.0 * cos) - (a.1 * sin)) as i32,
+                ((a.0 * sin) + (a.1 * cos)) as i32,
+            );
+            let a = ((a.0 + medium.0 as i32), (a.1 + medium.1 as i32));
 
-            let up_x = (x - CANVAS_WIDTH as i32).abs();
+            let b = ((initial_b.0 - medium.0), (initial_b.1 - medium.1));
+            let b = (
+                ((b.0 * cos) - (b.1 * sin)) as i32,
+                ((b.0 * sin) + (b.1 * cos)) as i32,
+            );
+            let b = ((b.0 + medium.0 as i32), (b.1 + medium.1 as i32));
 
-            canvas.draw_line((40, 0), (x, 10), '.');
-            canvas.draw_line((40, (CANVAS_HEIGHT - 1) as i32), (up_x, 10), '.');
-
-            canvas.draw_line((x, 10), (40, (CANVAS_HEIGHT - 1) as i32), '.');
-            canvas.draw_line((up_x, 10), (40, 0), '.');
+            canvas.draw_line(a, b, '#');
 
             canvas.render();
+
+            degree += 0.1;
 
             render_duration = Instant::now().duration_since(start_render);
             last_frame_time = start;
