@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 const FPS: u128 = 60;
 
 const CANVAS_WIDTH: u32 = 80;
-const CANVAS_HEIGHT: u32 = 20;
+const CANVAS_HEIGHT: u32 = 22;
 
 type Vec2d = (i32, i32);
 
@@ -96,6 +96,37 @@ impl Canvas {
         }
     }
 
+    fn render_circle(&mut self, c: Vec2d, v: Vec2d, ch: char) {
+        self.draw_pixel((c.0 + v.0) as u32, (c.1 + v.1) as u32, ch);
+        self.draw_pixel((c.0 - v.0) as u32, (c.1 + v.1) as u32, ch);
+        self.draw_pixel((c.0 + v.0) as u32, (c.1 - v.1) as u32, ch);
+        self.draw_pixel((c.0 - v.0) as u32, (c.1 - v.1) as u32, ch);
+        self.draw_pixel((c.0 + v.1) as u32, (c.1 + v.0) as u32, ch);
+        self.draw_pixel((c.0 - v.1) as u32, (c.1 + v.0) as u32, ch);
+        self.draw_pixel((c.0 + v.1) as u32, (c.1 - v.0) as u32, ch);
+        self.draw_pixel((c.0 - v.1) as u32, (c.1 - v.0) as u32, ch);
+    }
+
+    pub fn draw_circle(&mut self, c: Vec2d, r: i32, ch: char) {
+        let mut x = 0;
+        let mut y = r;
+        let mut d = 3 - 2 * r;
+
+        self.render_circle(c, (x, y), ch);
+
+        while y >= x {
+            x += 1;
+
+            if d > 0 {
+                y -= 1;
+                d = d + 4 * (x - y) + 10;
+            } else {
+                d = d + 4 * x + 6;
+            }
+            self.render_circle(c, (x, y), ch);
+        }
+    }
+
     pub fn render(&self) {
         Self::clear();
 
@@ -106,17 +137,23 @@ impl Canvas {
 fn main() {
     let mut render_duration = Duration::default();
     let mut last_frame_time = Instant::now();
+    let mut delta_time = Instant::now();
     let minimum_frame_duration = 1000 / FPS;
 
     let mut canvas = Canvas::new();
-    let mut degree: f32 = 0.0;
+    let mut degree_a: f32 = 0.0;
+    let mut degree_b: f32 = 0.0;
 
-    let initial_a: (f32, f32) = (15.0, CANVAS_HEIGHT as f32 / 2.0);
-    let initial_b: (f32, f32) = (35.0, CANVAS_HEIGHT as f32 / 2.0);
-    let medium: (f32, f32) = (
-        (initial_a.0 + initial_b.0) / 2.0,
-        (initial_a.1 + initial_b.1) / 2.0,
-    );
+    // Make clock time go faster
+    let a = 120.0;
+    let degree_a_off =
+        (2.0 * std::f32::consts::PI / Duration::from_secs(3600).as_millis() as u32 as f32) * a;
+    let degree_b_off =
+        (2.0 * std::f32::consts::PI / Duration::from_secs(12 * 3600).as_millis() as u32 as f32) * a;
+
+    let initial_a: (f32, f32) = (25.0, 20.0);
+    let initial_b: (f32, f32) = (25.0, 15.0);
+    let medium: (f32, f32) = (25.0, 11.0);
 
     loop {
         let start = Instant::now();
@@ -126,30 +163,39 @@ fn main() {
             let start_render = Instant::now();
             canvas.clear_canvas();
 
-            let cos = degree.cos();
-            let sin = degree.sin();
+            let cos = degree_a.cos();
+            let sin = degree_a.sin();
 
             let a = ((initial_a.0 - medium.0), (initial_a.1 - medium.1));
             let a = (
-                ((a.0 * cos) - (a.1 * sin)) as i32,
-                ((a.0 * sin) + (a.1 * cos)) as i32,
+                ((a.0 * cos) + (a.1 * sin)) as i32,
+                (-(a.0 * sin) + (a.1 * cos)) as i32,
             );
             let a = ((a.0 + medium.0 as i32), (a.1 + medium.1 as i32));
 
+            let cos = degree_b.cos();
+            let sin = degree_b.sin();
+
             let b = ((initial_b.0 - medium.0), (initial_b.1 - medium.1));
             let b = (
-                ((b.0 * cos) - (b.1 * sin)) as i32,
-                ((b.0 * sin) + (b.1 * cos)) as i32,
+                ((b.0 * cos) + (b.1 * sin)) as i32,
+                (-(b.0 * sin) + (b.1 * cos)) as i32,
             );
             let b = ((b.0 + medium.0 as i32), (b.1 + medium.1 as i32));
 
-            canvas.draw_line(a, b, '#');
+            let medium = (medium.0 as i32, medium.1 as i32);
+
+            canvas.draw_circle(medium, 10, '#');
+            canvas.draw_line(a, medium, '*');
+            canvas.draw_line(medium, b, '.');
 
             canvas.render();
 
-            degree += 0.1;
+            degree_a += degree_a_off * delta_time.elapsed().as_millis() as u32 as f32;
+            degree_b += degree_b_off * delta_time.elapsed().as_millis() as u32 as f32;
 
-            render_duration = Instant::now().duration_since(start_render);
+            delta_time = Instant::now();
+            render_duration = delta_time.duration_since(start_render);
             last_frame_time = start;
         }
     }
